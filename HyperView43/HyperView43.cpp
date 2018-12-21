@@ -165,10 +165,20 @@ int Convert(char* filename) {
 													  // WINDOW_OPENGL : The window will be created with OpenGL support.
 
 	cv::VideoWriter outputVideo;                                        // Open the output
+	
+
+	auto codec = reader.get(cv::CAP_PROP_FOURCC);
+	//codec = cv::VideoWriter::fourcc('M', 'P', '4', '4');
+	codec = 0x7634706d;// 'mp4v' best bitrate/size ratio codec I found. I don't know how it works
+	//codec = cv::VideoWriter::fourcc('x', '2', '6', '4');
+	outputVideo.set(cv::VIDEOWRITER_PROP_QUALITY, 1);
+
+	
+	outputVideo.open(new_filename, codec, FPS, cv::Size(new_width, height), true);
 
 
-	outputVideo.open(new_filename, reader.get(cv::CAP_PROP_FOURCC), FPS, cv::Size(new_width, height), true);
-
+	//printf("%d\n",(reader.get(cv::CAP_PROP_FOURCC)));
+	//outputVideo.set(cv::VIDEOWRITER_PROP_QUALITY, 0.001);
 
 	auto begin = Clock::now();
 	auto one_frame_end = Clock::now();
@@ -179,7 +189,7 @@ int Convert(char* filename) {
 	std::string text = "";
 
 	std::vector<float> all_times;
-	while (1)
+	while (frame_counter<frame_count)
 	{
 		frame_counter++;
 		cv::Mat frame;
@@ -195,6 +205,7 @@ int Convert(char* filename) {
 								 // read() decodes and captures the next frame.
 		{
 			std::cout << "\n Cannot read the video file. \n";
+			printf("frames: %d, frame_counter: %d\n", frame_count, frame_counter);
 			break;
 		}
 
@@ -270,6 +281,7 @@ int main(int argc, char** argv)
 		cv::waitKey(10000);
 		return 1;
 	}
+
 	for (int i = 1; i < argc; i++) {
 		std::cout << argv[i] << std::endl;
 		Convert(argv[i]);
