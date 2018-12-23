@@ -37,35 +37,26 @@ cv::Vec3b BilinearInterpolation(float x, float y, cv::Mat* img_for_distortion)
 {
 	{
 
-	
+
 		int x0 = cv::borderInterpolate(x, img_for_distortion->cols, cv::BORDER_REFLECT_101);
 		int x1 = cv::borderInterpolate(x + 1, img_for_distortion->cols, cv::BORDER_REFLECT_101);
 		int y0 = cv::borderInterpolate(y, img_for_distortion->rows, cv::BORDER_REFLECT_101);
 		int y1 = cv::borderInterpolate(y + 1, img_for_distortion->rows, cv::BORDER_REFLECT_101);
 
-	
+		// x = (int)x;
+		//y = (int)y;
+
 		float a = x - (int)x;
 		float c = y - (int)y;
 
-		//cv::Vec3b y0x0 = img_for_distortion->at<cv::Vec3b>(y0, x0);
-		//cv::Vec3b y0x1 = img_for_distortion->at<cv::Vec3b>(y0, x1);
-		//cv::Vec3b y1x0 = img_for_distortion->at<cv::Vec3b>(y1, x0);
-		//cv::Vec3b y1x1 = img_for_distortion->at<cv::Vec3b>(y1, x1);
-
-
-		cv::Vec3b out = (img_for_distortion->at<cv::Vec3b>(y0, x0) * (1.f - a) + img_for_distortion->at<cv::Vec3b>(y0, x1) * a) * (1.f - c)
-			+ (img_for_distortion->at<cv::Vec3b>(y1, x0) * (1.f - a) + img_for_distortion->at<cv::Vec3b>(y1, x1) * a) * c;
-		//cv::Vec3b out = (y0x0 * (1.f - a) + y0x1 * a) * (1.f - c)
-		//	+ (y1x0 * (1.f - a) + y1x1 * a) * c;
-		//uchar b = (uchar)cvRound((y0x0 * (1.f - a) + y0x1 * a) * (1.f - c)
-		//	+ (y1x0 * (1.f - a) + y1x1 * a) * c);
-		/*uchar g = (uchar)cvRound((y0x0[1] * (1.f - a) + y0x1[1] * a) * (1.f - c)
-			+ (y1x0[1] * (1.f - a) + y1x1[1] * a) * c);
+		uchar b = (uchar)cvRound((img_for_distortion->at<cv::Vec3b>(y0, x0)[0] * (1.f - a) + img_for_distortion->at<cv::Vec3b>(y0, x1)[0] * a) * (1.f - c)
+			+ (img_for_distortion->at<cv::Vec3b>(y1, x0)[0] * (1.f - a) + img_for_distortion->at<cv::Vec3b>(y1, x1)[0] * a) * c);
+		uchar g = (uchar)cvRound((img_for_distortion->at<cv::Vec3b>(y0, x0)[1] * (1.f - a) + img_for_distortion->at<cv::Vec3b>(y0, x1)[1] * a) * (1.f - c)
+			+ (img_for_distortion->at<cv::Vec3b>(y1, x0)[1] * (1.f - a) + img_for_distortion->at<cv::Vec3b>(y1, x1)[1] * a) * c);
 		uchar r = (uchar)cvRound((img_for_distortion->at<cv::Vec3b>(y0, x0)[2] * (1.f - a) + img_for_distortion->at<cv::Vec3b>(y0, x1)[2] * a) * (1.f - c)
-			+ (img_for_distortion->at<cv::Vec3b>(y1, x0)[2] * (1.f - a) + img_for_distortion->at<cv::Vec3b>(y1, x1)[2] * a) * c);*/
+			+ (img_for_distortion->at<cv::Vec3b>(y1, x0)[2] * (1.f - a) + img_for_distortion->at<cv::Vec3b>(y1, x1)[2] * a) * c);
 
-		//return cv::Vec3b(b, g, r);
-		return out;
+		return cv::Vec3b(b, g, r);
 	}
 
 }
@@ -74,11 +65,14 @@ cv::Vec3b BilinearInterpolation(float x, float y, cv::Mat* img_for_distortion)
 
 cv::Mat Hyperview(cv::Mat *widen_input_img, float* distortion_array, int size_of_array) {
 	cv::Mat hyperview_img = cv::Mat(cv::Size(widen_input_img->cols, widen_input_img->rows), CV_8UC3);
-    omp_set_num_threads(16);
-    #pragma omp parallel for //shared(hyperview_img)
+	omp_set_num_threads(8);
+#pragma omp parallel for //shared(hyperview_img)
 	for (int x = 0; x < size_of_array; x++) {
 		for (int y = 0; y < widen_input_img->rows; y++) {
+			//printf("%d,%d, really: %d \n", x, y,widen_input_img->rows);
+
 			hyperview_img.at<cv::Vec3b>(y, x) = BilinearInterpolation(distortion_array[x], y, widen_input_img);
+
 		}
 	}
 	return  hyperview_img;
@@ -191,8 +185,6 @@ int Convert(char* filename) {
 	auto one_frame_begin = Clock::now();
 	float avg_time = 0;
 	float remaining_seconds = 0;
-	float elapsed_seconds = 0;
-	float projected_seconds = 0;
 	int frame_counter = 0;
 	std::string text = "";
 
@@ -218,8 +210,8 @@ int Convert(char* filename) {
 		}
 
 		cv::resize(frame, widen, cv::Size(new_width, height));
-		hyperview_img = Hyperview(&widen, distortion_array, new_width);
 
+		hyperview_img = Hyperview(&widen, distortion_array, new_width);
 
 		//cv::Mat resized;
 		float resize_factor = 480.0 / height;
@@ -238,21 +230,12 @@ int Convert(char* filename) {
 		avg_time /= all_times.size();
 		avg_time /= 1000000000;
 		remaining_seconds = (frame_count - frame_counter)*avg_time;
-		elapsed_seconds = std::chrono::duration_cast<std::chrono::nanoseconds>(one_frame_end - begin).count() / 1000000000;
-		if (frame_counter < 100) {
-			projected_seconds = frame_count*avg_time;
-		}
-		
 
 		//sprintf_s(text, "One frame time: %0.2f, Remaining time: %0.2f",(avg_time), (remaining_seconds / 60));
 		text = "One Frame Time: " + std::to_string(avg_time);
 		cv::putText(resized_hyperview, text, cv::Point((int)0, (int)10), 1, 1, cv::Scalar(255, 255, 255, 0));
 		text = "Remaining Time:" + std::to_string((int)(remaining_seconds / 60)) + "min" + " " + std::to_string((int)(60 * ((remaining_seconds / 60) - (int)(remaining_seconds / 60)))) + " seconds";
 		cv::putText(resized_hyperview, text, cv::Point((int)0, (int)30), 1, 1, cv::Scalar(0, 128, 255, 0));
-		text = "Elapsed Time:" + std::to_string((int)(elapsed_seconds / 60)) + "min" + " " + std::to_string((int)(60 * ((elapsed_seconds / 60) - (int)(elapsed_seconds / 60)))) + " seconds";
-		cv::putText(resized_hyperview, text, cv::Point((int)0, (int)50), 1, 1, cv::Scalar(0, 128, 255, 0));
-		text = "Projected Time:" + std::to_string((int)(projected_seconds / 60)) + "min" + " " + std::to_string((int)(60 * ((projected_seconds / 60) - (int)(projected_seconds / 60)))) + " seconds";
-		cv::putText(resized_hyperview, text, cv::Point((int)0, (int)70), 1, 1, cv::Scalar(0, 128, 255, 0));
 
 
 		imshow("Progress", resized_hyperview);
@@ -267,7 +250,6 @@ int Convert(char* filename) {
 		}
 
 	}
-
 }
 
 
