@@ -108,6 +108,7 @@ int Convert(char* filename) {
 	//printf("%s", argv[1]);
 	reader.open(filename);
 	std::string new_filename = getPathName(filename) + "_Hyperview43.mp4";
+	std::string new_filename_lowRes = getPathName(filename) + "_Hyperview43_480p.mp4";
 
 	std::cout << "Converting this file: " + getPathName(filename) + "\nParameters: \n";
 	//std::cout << "The path name is \"" << getPathName(argv[1]) << "\"\n";
@@ -170,7 +171,8 @@ int Convert(char* filename) {
 													  // WINDOW_AUTOSIZE : The window size is automatically adjusted to fitvthe displayed image() ), and you cannot change the window size manually.
 													  // WINDOW_OPENGL : The window will be created with OpenGL support.
 
-	cv::VideoWriter outputVideo;                                        // Open the output
+	cv::VideoWriter outputVideo;
+	cv::VideoWriter outputVideo_lowRes;                                        // Open the output
 	
 
 	auto codec = reader.get(cv::CAP_PROP_FOURCC);
@@ -179,8 +181,9 @@ int Convert(char* filename) {
 	//codec = cv::VideoWriter::fourcc('x', '2', '6', '4');
 	outputVideo.set(cv::VIDEOWRITER_PROP_QUALITY, 1);
 
-	
+	float resize_factor = 480.0 / height;
 	outputVideo.open(new_filename, codec, FPS, cv::Size(new_width, height), true);
+	outputVideo_lowRes.open(new_filename, codec, FPS, cv::Size(new_width*resize_factor, height*resize_factor), true);
 
 
 	//printf("%d\n",(reader.get(cv::CAP_PROP_FOURCC)));
@@ -222,11 +225,16 @@ int Convert(char* filename) {
 
 
 		//cv::Mat resized;
-		float resize_factor = 480.0 / height;
+		
 		//cv::resize(frame, resized, cv::Size((int)(width*resize_factor), (int)(height*resize_factor)));
 		//imshow("Progress", resized);
 		cv::Mat resized_hyperview;
 		cv::resize(hyperview_img, resized_hyperview, cv::Size((int)(hyperview_img.cols*resize_factor), (int)(hyperview_img.rows*resize_factor)));
+
+
+		outputVideo_lowRes.write(resized_hyperview);
+
+
 		one_frame_end = Clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(one_frame_end - one_frame_begin).count();
 		one_frame_begin = Clock::now();
