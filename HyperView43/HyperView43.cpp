@@ -102,6 +102,7 @@ int Convert(char* filename) {
 	//printf("%s", argv[1]);
 	reader.open(filename);
 	std::string new_filename = getPathName(filename) + "_Hyperview43.mp4";
+	std::string new_filename_lowRes = getPathName(filename) + "_Hyperview43_480p.mp4";
 
 	std::cout << "Converting this file: " + getPathName(filename) + "\nParameters: \n";
 	//std::cout << "The path name is \"" << getPathName(argv[1]) << "\"\n";
@@ -164,7 +165,8 @@ int Convert(char* filename) {
 													  // WINDOW_AUTOSIZE : The window size is automatically adjusted to fitvthe displayed image() ), and you cannot change the window size manually.
 													  // WINDOW_OPENGL : The window will be created with OpenGL support.
 
-	cv::VideoWriter outputVideo;                                        // Open the output
+	cv::VideoWriter outputVideo;
+	cv::VideoWriter outputVideo_lowRes;                                        // Open the output
 	
 
 	auto codec = reader.get(cv::CAP_PROP_FOURCC);
@@ -173,8 +175,11 @@ int Convert(char* filename) {
 	//codec = cv::VideoWriter::fourcc('x', '2', '6', '4');
 	outputVideo.set(cv::VIDEOWRITER_PROP_QUALITY, 1);
 
-	
+	float resize_factor = 480.0 / height;
+
 	outputVideo.open(new_filename, codec, FPS, cv::Size(new_width, height), true);
+
+	outputVideo_lowRes.open(new_filename_lowRes, codec, FPS, cv::Size(new_width*resize_factor, height*resize_factor), true);
 
 
 	//printf("%d\n",(reader.get(cv::CAP_PROP_FOURCC)));
@@ -214,7 +219,6 @@ int Convert(char* filename) {
 		hyperview_img = Hyperview(&widen, distortion_array, new_width);
 
 		//cv::Mat resized;
-		float resize_factor = 480.0 / height;
 		//cv::resize(frame, resized, cv::Size((int)(width*resize_factor), (int)(height*resize_factor)));
 		//imshow("Progress", resized);
 		cv::Mat resized_hyperview;
@@ -243,6 +247,7 @@ int Convert(char* filename) {
 		// second argument: image to be shown(Mat object).
 
 		outputVideo.write(hyperview_img);
+		outputVideo_lowRes.write(resized_hyperview);
 
 		if (cv::waitKey(1) == 27) // Wait for 'esc' key press to exit
 		{
