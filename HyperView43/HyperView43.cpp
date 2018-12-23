@@ -183,7 +183,7 @@ int Convert(char* filename) {
 
 	float resize_factor = 480.0 / height;
 	outputVideo.open(new_filename, codec, FPS, cv::Size(new_width, height), true);
-	outputVideo_lowRes.open(new_filename, codec, FPS, cv::Size(new_width*resize_factor, height*resize_factor), true);
+	outputVideo_lowRes.open(new_filename_lowRes, codec, FPS, cv::Size(new_width*resize_factor, height*resize_factor), true);
 
 
 	//printf("%d\n",(reader.get(cv::CAP_PROP_FOURCC)));
