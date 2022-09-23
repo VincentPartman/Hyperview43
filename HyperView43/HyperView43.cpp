@@ -9,6 +9,7 @@
 #include <omp.h>
 #include <chrono>
 #include <filesystem>
+#include  <vector>
 
 typedef std::chrono::high_resolution_clock Clock;
 
@@ -101,6 +102,78 @@ std::string getPathName(std::string filename) {
 	return filename;
 }
 
+
+void readImagesAndTimes(vector<cv::Mat>& images, vector<cv::float>& times)
+{
+
+	int numImages = 4;
+
+	// List of exposure times
+	static const float timesArray[] = { 1 / 30.0f,0.25,2.5,15.0 };
+	times.assign(timesArray, timesArray + numImages);
+
+	// List of image filenames
+	static const char* filenames[] = { "img_0.033.jpg", "img_0.25.jpg", "img_2.5.jpg", "img_15.jpg" };
+	for (int i = 0; i < numImages; i++)
+	{
+		Mat im = imread(filenames[i]);
+		images.push_back(im);
+	}
+
+}
+
+void GammaCorrection(cv::Mat& src, cv::Mat& dst, float fGamma)
+{
+	unsigned char lut[256];
+	for (int i = 0; i < 256; i++)
+	{
+		lut[i] = saturate_cast<uchar>(pow((float)(i / 255.0), fGamma) * 255.0f);
+	}
+	dst = src.clone();
+
+	const int channels = dst.channels();
+	switch (channels)
+	{
+	case 1:
+	{
+		MatIterator_<uchar> it, end;
+		for (it = dst.begin<uchar>(), end = dst.end<uchar>(); it != end; it++)
+			*it = lut[(*it)];
+		break;
+	}
+	case 3:
+	{
+		MatIterator_<Vec3b> it, end;
+		for (it = dst.begin<Vec3b>(), end = dst.end<Vec3b>(); it != end; it++)
+		{
+			(*it)[0] = lut[((*it)[0])];
+			(*it)[1] = lut[((*it)[1])];
+			(*it)[2] = lut[((*it)[2])];
+		}
+		break;
+	}
+}
+void HDR() {
+	// Obtain Camera Response Function (CRF)
+	cv::Mat responseDebevec;
+	vector<cv::Mat> images;
+	cv::Ptr<cv::CalibrateDebevec> calibrateDebevec = cv::createCalibrateDebevec();
+	cv::CalibrateDebevec->process(images, responseDebevec, times); //got from array of images
+
+	// Merge images into an HDR linear image
+	cv::Mat hdrDebevec;
+	cv::Ptr<cv::MergeDebevec> mergeDebevec = cv::createMergeDebevec();
+	mergeDebevec->process(images, hdrDebevec, times, responseDebevec);
+	// Save HDR image.
+	imwrite("hdrDebevec.hdr", hdrDebevec);
+
+	// Tonemap using Drago's method to obtain 24-bit color image
+	cv::Mat ldrDrago;
+	cv::Ptr<cv::TonemapDrago> tonemapDrago = cv::createTonemapDrago(1.0, 0.7);
+	tonemapDrago->process(hdrDebevec, ldrDrago);
+	ldrDrago = 3 * ldrDrago;
+	imwrite("ldr-Drago.jpg", ldrDrago * 255);
+}
 
 int Convert(char* filename) {
 	cv::VideoCapture reader;
