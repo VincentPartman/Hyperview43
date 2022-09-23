@@ -2,7 +2,7 @@
 //
 
 #include "stdafx.h"
-#include "opencv2\opencv.hpp"
+#include "..\opencv\build\include\opencv2\opencv.hpp"
 #include <stdio.h>
 #include <math.h>
 
@@ -108,7 +108,7 @@ int Convert(char* filename) {
 	//printf("%s", argv[1]);
 	reader.open(filename);
 	std::string new_filename = getPathName(filename) + "_Hyperview43.mp4";
-	std::string new_filename_lowRes = getPathName(filename) + "_Hyperview43_480p.mp4";
+	std::string new_filename_lowRes = getPathName(filename)+ "480.mp4";
 
 	std::cout << "Converting this file: " + getPathName(filename) + "\nParameters: \n";
 	//std::cout << "The path name is \"" << getPathName(argv[1]) << "\"\n";
@@ -178,12 +178,12 @@ int Convert(char* filename) {
 	auto codec = reader.get(cv::CAP_PROP_FOURCC);
 	//codec = cv::VideoWriter::fourcc('M', 'P', '4', '4');
 	codec = 0x7634706d;// 'mp4v' best bitrate/size ratio codec I found. I don't know how it works
-	//codec = cv::VideoWriter::fourcc('x', '2', '6', '4');
+	//codec = cv::VideoWriter::fourcc('x', 'v', 'i', 'd');
 	outputVideo.set(cv::VIDEOWRITER_PROP_QUALITY, 1);
 
 	float resize_factor = 480.0 / height;
-	outputVideo.open(new_filename, codec, FPS, cv::Size(new_width, height), true);
-	outputVideo_lowRes.open(new_filename_lowRes, codec, FPS, cv::Size(new_width*resize_factor, height*resize_factor), true);
+	//outputVideo.open(new_filename, codec, FPS, cv::Size(new_width, height), true);
+	outputVideo_lowRes.open(new_filename_lowRes, codec, fps, cv::Size(width*resize_factor, height*resize_factor), true);
 
 
 	//printf("%d\n",(reader.get(cv::CAP_PROP_FOURCC)));
@@ -205,7 +205,7 @@ int Convert(char* filename) {
 		frame_counter++;
 		cv::Mat frame;
 		cv::Mat widen;
-		cv::Mat hyperview_img = cv::Mat(cv::Size(new_width, height), CV_8UC3);
+		cv::Mat hyperview_img = cv::Mat(cv::Size(width, height), CV_8UC3);
 
 
 
@@ -220,16 +220,17 @@ int Convert(char* filename) {
 			break;
 		}
 
-		cv::resize(frame, widen, cv::Size(new_width, height));
-		hyperview_img = Hyperview(&widen, distortion_array, new_width);
+		cv::resize(frame, widen, cv::Size((int)(hyperview_img.cols*resize_factor), (int)(hyperview_img.rows*resize_factor)));
+		//hyperview_img = Hyperview(&widen, distortion_array, new_width);
+		hyperview_img = widen;
 
 
 		//cv::Mat resized;
 		
 		//cv::resize(frame, resized, cv::Size((int)(width*resize_factor), (int)(height*resize_factor)));
 		//imshow("Progress", resized);
-		cv::Mat resized_hyperview;
-		cv::resize(hyperview_img, resized_hyperview, cv::Size((int)(hyperview_img.cols*resize_factor), (int)(hyperview_img.rows*resize_factor)));
+		cv::Mat resized_hyperview = widen;
+		//cv::resize(hyperview_img, resized_hyperview, cv::Size((int)(hyperview_img.cols*resize_factor), (int)(hyperview_img.rows*resize_factor)));
 
 
 		outputVideo_lowRes.write(resized_hyperview);
@@ -253,17 +254,18 @@ int Convert(char* filename) {
 		
 
 		//sprintf_s(text, "One frame time: %0.2f, Remaining time: %0.2f",(avg_time), (remaining_seconds / 60));
-		text = "One Frame Time: " + std::to_string(avg_time);
-		cv::putText(resized_hyperview, text, cv::Point((int)0, (int)10), 1, 1, cv::Scalar(255, 255, 255, 0));
+		//text = "One Frame Time: " + std::to_string(avg_time);
+		//cv::putText(resized_hyperview, text, cv::Point((int)0, (int)10), 1, 1, cv::Scalar(255, 255, 255, 0));
 		text = "Remaining Time:" + std::to_string((int)(remaining_seconds / 60)) + "min" + " " + std::to_string((int)(60 * ((remaining_seconds / 60) - (int)(remaining_seconds / 60)))) + " seconds";
-		cv::putText(resized_hyperview, text, cv::Point((int)0, (int)30), 1, 1, cv::Scalar(0, 128, 255, 0));
-		text = "Elapsed Time:" + std::to_string((int)(elapsed_seconds / 60)) + "min" + " " + std::to_string((int)(60 * ((elapsed_seconds / 60) - (int)(elapsed_seconds / 60)))) + " seconds";
-		cv::putText(resized_hyperview, text, cv::Point((int)0, (int)50), 1, 1, cv::Scalar(0, 128, 255, 0));
-		text = "Projected Time:" + std::to_string((int)(projected_seconds / 60)) + "min" + " " + std::to_string((int)(60 * ((projected_seconds / 60) - (int)(projected_seconds / 60)))) + " seconds";
-		cv::putText(resized_hyperview, text, cv::Point((int)0, (int)70), 1, 1, cv::Scalar(0, 128, 255, 0));
+		if (frame_counter % 200 == 0) std::cout << text << "\n";
+		//cv::putText(resized_hyperview, text, cv::Point((int)0, (int)30), 1, 1, cv::Scalar(0, 128, 255, 0));
+		//text = "Elapsed Time:" + std::to_string((int)(elapsed_seconds / 60)) + "min" + " " + std::to_string((int)(60 * ((elapsed_seconds / 60) - (int)(elapsed_seconds / 60)))) + " seconds";
+		//cv::putText(resized_hyperview, text, cv::Point((int)0, (int)50), 1, 1, cv::Scalar(0, 128, 255, 0));
+		//text = "Projected Time:" + std::to_string((int)(projected_seconds / 60)) + "min" + " " + std::to_string((int)(60 * ((projected_seconds / 60) - (int)(projected_seconds / 60)))) + " seconds";
+		//cv::putText(resized_hyperview, text, cv::Point((int)0, (int)70), 1, 1, cv::Scalar(0, 128, 255, 0));
 
 
-		imshow("Progress", resized_hyperview);
+		//imshow("Progress", resized_hyperview);
 		// first argument: name of the window.
 		// second argument: image to be shown(Mat object).
 
