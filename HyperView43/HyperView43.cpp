@@ -2,14 +2,13 @@
 //
 
 #include "stdafx.h"
-#include "..\opencv\build\include\opencv2\opencv.hpp"
+#include "opencv2\opencv.hpp"
 #include <stdio.h>
 #include <math.h>
 
 #include <omp.h>
 #include <chrono>
 #include <filesystem>
-#include  <vector>
 
 typedef std::chrono::high_resolution_clock Clock;
 
@@ -38,35 +37,26 @@ cv::Vec3b BilinearInterpolation(float x, float y, cv::Mat* img_for_distortion)
 {
 	{
 
-	
+
 		int x0 = cv::borderInterpolate(x, img_for_distortion->cols, cv::BORDER_REFLECT_101);
 		int x1 = cv::borderInterpolate(x + 1, img_for_distortion->cols, cv::BORDER_REFLECT_101);
 		int y0 = cv::borderInterpolate(y, img_for_distortion->rows, cv::BORDER_REFLECT_101);
 		int y1 = cv::borderInterpolate(y + 1, img_for_distortion->rows, cv::BORDER_REFLECT_101);
 
-	
+		// x = (int)x;
+		//y = (int)y;
+
 		float a = x - (int)x;
 		float c = y - (int)y;
 
-		//cv::Vec3b y0x0 = img_for_distortion->at<cv::Vec3b>(y0, x0);
-		//cv::Vec3b y0x1 = img_for_distortion->at<cv::Vec3b>(y0, x1);
-		//cv::Vec3b y1x0 = img_for_distortion->at<cv::Vec3b>(y1, x0);
-		//cv::Vec3b y1x1 = img_for_distortion->at<cv::Vec3b>(y1, x1);
-
-
-		cv::Vec3b out = (img_for_distortion->at<cv::Vec3b>(y0, x0) * (1.f - a) + img_for_distortion->at<cv::Vec3b>(y0, x1) * a) * (1.f - c)
-			+ (img_for_distortion->at<cv::Vec3b>(y1, x0) * (1.f - a) + img_for_distortion->at<cv::Vec3b>(y1, x1) * a) * c;
-		//cv::Vec3b out = (y0x0 * (1.f - a) + y0x1 * a) * (1.f - c)
-		//	+ (y1x0 * (1.f - a) + y1x1 * a) * c;
-		//uchar b = (uchar)cvRound((y0x0 * (1.f - a) + y0x1 * a) * (1.f - c)
-		//	+ (y1x0 * (1.f - a) + y1x1 * a) * c);
-		/*uchar g = (uchar)cvRound((y0x0[1] * (1.f - a) + y0x1[1] * a) * (1.f - c)
-			+ (y1x0[1] * (1.f - a) + y1x1[1] * a) * c);
+		uchar b = (uchar)cvRound((img_for_distortion->at<cv::Vec3b>(y0, x0)[0] * (1.f - a) + img_for_distortion->at<cv::Vec3b>(y0, x1)[0] * a) * (1.f - c)
+			+ (img_for_distortion->at<cv::Vec3b>(y1, x0)[0] * (1.f - a) + img_for_distortion->at<cv::Vec3b>(y1, x1)[0] * a) * c);
+		uchar g = (uchar)cvRound((img_for_distortion->at<cv::Vec3b>(y0, x0)[1] * (1.f - a) + img_for_distortion->at<cv::Vec3b>(y0, x1)[1] * a) * (1.f - c)
+			+ (img_for_distortion->at<cv::Vec3b>(y1, x0)[1] * (1.f - a) + img_for_distortion->at<cv::Vec3b>(y1, x1)[1] * a) * c);
 		uchar r = (uchar)cvRound((img_for_distortion->at<cv::Vec3b>(y0, x0)[2] * (1.f - a) + img_for_distortion->at<cv::Vec3b>(y0, x1)[2] * a) * (1.f - c)
-			+ (img_for_distortion->at<cv::Vec3b>(y1, x0)[2] * (1.f - a) + img_for_distortion->at<cv::Vec3b>(y1, x1)[2] * a) * c);*/
+			+ (img_for_distortion->at<cv::Vec3b>(y1, x0)[2] * (1.f - a) + img_for_distortion->at<cv::Vec3b>(y1, x1)[2] * a) * c);
 
-		//return cv::Vec3b(b, g, r);
-		return out;
+		return cv::Vec3b(b, g, r);
 	}
 
 }
@@ -75,11 +65,14 @@ cv::Vec3b BilinearInterpolation(float x, float y, cv::Mat* img_for_distortion)
 
 cv::Mat Hyperview(cv::Mat *widen_input_img, float* distortion_array, int size_of_array) {
 	cv::Mat hyperview_img = cv::Mat(cv::Size(widen_input_img->cols, widen_input_img->rows), CV_8UC3);
-    omp_set_num_threads(16);
-    #pragma omp parallel for //shared(hyperview_img)
+	omp_set_num_threads(8);
+#pragma omp parallel for //shared(hyperview_img)
 	for (int x = 0; x < size_of_array; x++) {
 		for (int y = 0; y < widen_input_img->rows; y++) {
+			//printf("%d,%d, really: %d \n", x, y,widen_input_img->rows);
+
 			hyperview_img.at<cv::Vec3b>(y, x) = BilinearInterpolation(distortion_array[x], y, widen_input_img);
+
 		}
 	}
 	return  hyperview_img;
@@ -103,85 +96,12 @@ std::string getPathName(std::string filename) {
 }
 
 
-void readImagesAndTimes(vector<cv::Mat>& images, vector<cv::float>& times)
-{
-
-	int numImages = 4;
-
-	// List of exposure times
-	static const float timesArray[] = { 1 / 30.0f,0.25,2.5,15.0 };
-	times.assign(timesArray, timesArray + numImages);
-
-	// List of image filenames
-	static const char* filenames[] = { "img_0.033.jpg", "img_0.25.jpg", "img_2.5.jpg", "img_15.jpg" };
-	for (int i = 0; i < numImages; i++)
-	{
-		Mat im = imread(filenames[i]);
-		images.push_back(im);
-	}
-
-}
-
-void GammaCorrection(cv::Mat& src, cv::Mat& dst, float fGamma)
-{
-	unsigned char lut[256];
-	for (int i = 0; i < 256; i++)
-	{
-		lut[i] = saturate_cast<uchar>(pow((float)(i / 255.0), fGamma) * 255.0f);
-	}
-	dst = src.clone();
-
-	const int channels = dst.channels();
-	switch (channels)
-	{
-	case 1:
-	{
-		MatIterator_<uchar> it, end;
-		for (it = dst.begin<uchar>(), end = dst.end<uchar>(); it != end; it++)
-			*it = lut[(*it)];
-		break;
-	}
-	case 3:
-	{
-		MatIterator_<Vec3b> it, end;
-		for (it = dst.begin<Vec3b>(), end = dst.end<Vec3b>(); it != end; it++)
-		{
-			(*it)[0] = lut[((*it)[0])];
-			(*it)[1] = lut[((*it)[1])];
-			(*it)[2] = lut[((*it)[2])];
-		}
-		break;
-	}
-}
-void HDR() {
-	// Obtain Camera Response Function (CRF)
-	cv::Mat responseDebevec;
-	vector<cv::Mat> images;
-	cv::Ptr<cv::CalibrateDebevec> calibrateDebevec = cv::createCalibrateDebevec();
-	cv::CalibrateDebevec->process(images, responseDebevec, times); //got from array of images
-
-	// Merge images into an HDR linear image
-	cv::Mat hdrDebevec;
-	cv::Ptr<cv::MergeDebevec> mergeDebevec = cv::createMergeDebevec();
-	mergeDebevec->process(images, hdrDebevec, times, responseDebevec);
-	// Save HDR image.
-	imwrite("hdrDebevec.hdr", hdrDebevec);
-
-	// Tonemap using Drago's method to obtain 24-bit color image
-	cv::Mat ldrDrago;
-	cv::Ptr<cv::TonemapDrago> tonemapDrago = cv::createTonemapDrago(1.0, 0.7);
-	tonemapDrago->process(hdrDebevec, ldrDrago);
-	ldrDrago = 3 * ldrDrago;
-	imwrite("ldr-Drago.jpg", ldrDrago * 255);
-}
-
 int Convert(char* filename) {
 	cv::VideoCapture reader;
 	//reader.open("D:/superviewtest/vid.mp4");
 	//printf("%s", argv[1]);
 	reader.open(filename);
 	std::string new_filename = getPathName(filename) + "_Hyperview43.mp4";
-	std::string new_filename_lowRes = getPathName(filename)+ "480.mp4";
 
 	std::cout << "Converting this file: " + getPathName(filename) + "\nParameters: \n";
 	//std::cout << "The path name is \"" << getPathName(argv[1]) << "\"\n";
@@ -244,19 +164,17 @@ int Convert(char* filename) {
 													  // WINDOW_AUTOSIZE : The window size is automatically adjusted to fitvthe displayed image() ), and you cannot change the window size manually.
 													  // WINDOW_OPENGL : The window will be created with OpenGL support.
 
-	cv::VideoWriter outputVideo;
-	cv::VideoWriter outputVideo_lowRes;                                        // Open the output
+	cv::VideoWriter outputVideo;                                        // Open the output
 	
 
 	auto codec = reader.get(cv::CAP_PROP_FOURCC);
 	//codec = cv::VideoWriter::fourcc('M', 'P', '4', '4');
 	codec = 0x7634706d;// 'mp4v' best bitrate/size ratio codec I found. I don't know how it works
-	//codec = cv::VideoWriter::fourcc('x', 'v', 'i', 'd');
+	//codec = cv::VideoWriter::fourcc('x', '2', '6', '4');
 	outputVideo.set(cv::VIDEOWRITER_PROP_QUALITY, 1);
 
-	float resize_factor = 480.0 / height;
-	//outputVideo.open(new_filename, codec, FPS, cv::Size(new_width, height), true);
-	outputVideo_lowRes.open(new_filename_lowRes, codec, fps, cv::Size(width*resize_factor, height*resize_factor), true);
+	
+	outputVideo.open(new_filename, codec, FPS, cv::Size(new_width, height), true);
 
 
 	//printf("%d\n",(reader.get(cv::CAP_PROP_FOURCC)));
@@ -267,8 +185,6 @@ int Convert(char* filename) {
 	auto one_frame_begin = Clock::now();
 	float avg_time = 0;
 	float remaining_seconds = 0;
-	float elapsed_seconds = 0;
-	float projected_seconds = 0;
 	int frame_counter = 0;
 	std::string text = "";
 
@@ -278,7 +194,7 @@ int Convert(char* filename) {
 		frame_counter++;
 		cv::Mat frame;
 		cv::Mat widen;
-		cv::Mat hyperview_img = cv::Mat(cv::Size(width, height), CV_8UC3);
+		cv::Mat hyperview_img = cv::Mat(cv::Size(new_width, height), CV_8UC3);
 
 
 
@@ -293,22 +209,16 @@ int Convert(char* filename) {
 			break;
 		}
 
-		cv::resize(frame, widen, cv::Size((int)(hyperview_img.cols*resize_factor), (int)(hyperview_img.rows*resize_factor)));
-		//hyperview_img = Hyperview(&widen, distortion_array, new_width);
-		hyperview_img = widen;
+		cv::resize(frame, widen, cv::Size(new_width, height));
 
+		hyperview_img = Hyperview(&widen, distortion_array, new_width);
 
 		//cv::Mat resized;
-		
+		float resize_factor = 480.0 / height;
 		//cv::resize(frame, resized, cv::Size((int)(width*resize_factor), (int)(height*resize_factor)));
 		//imshow("Progress", resized);
-		cv::Mat resized_hyperview = widen;
-		//cv::resize(hyperview_img, resized_hyperview, cv::Size((int)(hyperview_img.cols*resize_factor), (int)(hyperview_img.rows*resize_factor)));
-
-
-		outputVideo_lowRes.write(resized_hyperview);
-
-
+		cv::Mat resized_hyperview;
+		cv::resize(hyperview_img, resized_hyperview, cv::Size((int)(hyperview_img.cols*resize_factor), (int)(hyperview_img.rows*resize_factor)));
 		one_frame_end = Clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(one_frame_end - one_frame_begin).count();
 		one_frame_begin = Clock::now();
@@ -320,25 +230,15 @@ int Convert(char* filename) {
 		avg_time /= all_times.size();
 		avg_time /= 1000000000;
 		remaining_seconds = (frame_count - frame_counter)*avg_time;
-		elapsed_seconds = std::chrono::duration_cast<std::chrono::nanoseconds>(one_frame_end - begin).count() / 1000000000;
-		if (frame_counter < 100) {
-			projected_seconds = frame_count*avg_time;
-		}
-		
 
 		//sprintf_s(text, "One frame time: %0.2f, Remaining time: %0.2f",(avg_time), (remaining_seconds / 60));
-		//text = "One Frame Time: " + std::to_string(avg_time);
-		//cv::putText(resized_hyperview, text, cv::Point((int)0, (int)10), 1, 1, cv::Scalar(255, 255, 255, 0));
+		text = "One Frame Time: " + std::to_string(avg_time);
+		cv::putText(resized_hyperview, text, cv::Point((int)0, (int)10), 1, 1, cv::Scalar(255, 255, 255, 0));
 		text = "Remaining Time:" + std::to_string((int)(remaining_seconds / 60)) + "min" + " " + std::to_string((int)(60 * ((remaining_seconds / 60) - (int)(remaining_seconds / 60)))) + " seconds";
-		if (frame_counter % 200 == 0) std::cout << text << "\n";
-		//cv::putText(resized_hyperview, text, cv::Point((int)0, (int)30), 1, 1, cv::Scalar(0, 128, 255, 0));
-		//text = "Elapsed Time:" + std::to_string((int)(elapsed_seconds / 60)) + "min" + " " + std::to_string((int)(60 * ((elapsed_seconds / 60) - (int)(elapsed_seconds / 60)))) + " seconds";
-		//cv::putText(resized_hyperview, text, cv::Point((int)0, (int)50), 1, 1, cv::Scalar(0, 128, 255, 0));
-		//text = "Projected Time:" + std::to_string((int)(projected_seconds / 60)) + "min" + " " + std::to_string((int)(60 * ((projected_seconds / 60) - (int)(projected_seconds / 60)))) + " seconds";
-		//cv::putText(resized_hyperview, text, cv::Point((int)0, (int)70), 1, 1, cv::Scalar(0, 128, 255, 0));
+		cv::putText(resized_hyperview, text, cv::Point((int)0, (int)30), 1, 1, cv::Scalar(0, 128, 255, 0));
 
 
-		//imshow("Progress", resized_hyperview);
+		imshow("Progress", resized_hyperview);
 		// first argument: name of the window.
 		// second argument: image to be shown(Mat object).
 
@@ -350,7 +250,6 @@ int Convert(char* filename) {
 		}
 
 	}
-
 }
 
 
